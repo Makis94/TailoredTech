@@ -1,0 +1,201 @@
+// Prisma schema for the Data Room application.
+//
+// Design notes (see README.md "Data model" section for the full ERD write-up):
+// - Folder/File uniqueness within a parent is enforced with a `parentKey`/`folderKey`
+//   sentinel column ("ROOT" instead of NULL) because Postgres unique indexes treat
+//   NULL as distinct, which would otherwise let root-level items collide silently.
+// - File uploads never fail on a name conflict: re-uploading an existing name creates
+//   a new FileVersion (see FileVersion) instead of a duplicate File row.
+// - Sharing is polymorphic over DataRoom/Folder/File via three nullable FKs on Share,
+//   guarded by a CHECK constraint (added in a follow-up migration) so exactly one is set.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ShareResourceType {
+  DATA_ROOM
+  FOLDER
+  FILE
+}
+
+enum ShareMode {
+  PUBLIC
+  PERMISSIONED
+}
+
+// Reserved for future roles (e.g. EDITOR) — see README "How sharing scales" section.
+enum ShareRole {
+  VIEWER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dataRooms      DataRoom[]
+  ownedFolders   Folder[]
+  ownedFiles     File[]
+  uploadedVersions FileVersion[]
+  sharesCreated  Share[]      @relation("SharesCreatedBy")
+  shareGrants    ShareGrant[] @relation("ShareGrantsForUser")
+
+  @@map("users")
+}
+
+/// A Data Room is the top-level container ("drive") a user creates for a deal.
+/// It owns an implicit root — folders/files with a null parent belong directly to it.
+model DataRoom {
+  id        String   @id @default(uuid())
+  name      String
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  folders Folder[]
+  files   File[]
+  shares  Share[]
+
+  @@index([ownerId])
+  @@map("data_rooms")
+}
+
+model Folder {
+  id         String   @id @default(uuid())
+  name       String
+  dataRoomId String
+  dataRoom   DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  parentId   String?
+  parent     Folder?  @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Folder[] @relation("FolderChildren")
+
+  /// Mirrors parentId but defaults to "ROOT" instead of null so the unique
+  /// index below also catches duplicate names at the data room's top level.
+  parentKey String @default("ROOT")
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  files File[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shares Share[]
+
+  @@unique([dataRoomId, parentKey, name])
+  @@index([dataRoomId, parentId])
+  @@map("folders")
+}
+
+model File {
+  id         String   @id @default(uuid())
+  name       String
+  dataRoomId String
+  dataRoom   DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  folderId   String?
+  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  /// Mirrors folderId but defaults to "ROOT" — same reasoning as Folder.parentKey.
+  folderKey String @default("ROOT")
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  versions         FileVersion[] @relation("FileVersions")
+  currentVersionId String?       @unique
+  currentVersion   FileVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shares Share[]
+
+  @@unique([dataRoomId, folderKey, name])
+  @@index([dataRoomId, folderId])
+  @@map("files")
+}
+
+/// An immutable, uploaded blob. A File's `currentVersion` points at the newest
+/// row; older rows stay around for history when a name conflict creates a new version.
+model FileVersion {
+  id         String @id @default(uuid())
+  fileId     String
+  file       File   @relation("FileVersions", fields: [fileId], references: [id], onDelete: Cascade)
+  fileFor    File?  @relation("CurrentVersion")
+  versionNumber Int
+
+  storageKey String // object key inside the S3 bucket
+  size       Int    // bytes
+  mimeType   String
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([fileId, versionNumber])
+  @@map("file_versions")
+}
+
+/// A share grants read-only access to exactly one of dataRoomId/folderId/fileId
+/// (enforced by a CHECK constraint added in migration 2, since Prisma has no
+/// native polymorphic-FK support). Access to nested content is resolved at
+/// query time by walking up the folder tree to find a covering share.
+model Share {
+  id             String            @id @default(uuid())
+  resourceType   ShareResourceType
+
+  dataRoomId String?
+  dataRoom   DataRoom? @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  folderId   String?
+  folder     Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  fileId     String?
+  file       File?     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  mode  ShareMode
+  token String    @unique @default(uuid()) // used for public-link access
+
+  createdById String
+  createdBy   User   @relation("SharesCreatedBy", fields: [createdById], references: [id])
+
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  grants ShareGrant[]
+
+  @@index([dataRoomId])
+  @@index([folderId])
+  @@index([fileId])
+  @@map("shares")
+}
+
+/// One invited viewer on a PERMISSIONED share. Stored by email so an owner can
+/// invite someone who hasn't signed up yet; `userId` backfills once they do.
+model ShareGrant {
+  id      String @id @default(uuid())
+  shareId String
+  share   Share  @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  email  String
+  userId String?
+  user   User?   @relation("ShareGrantsForUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  role ShareRole @default(VIEWER)
+
+  createdAt DateTime @default(now())
+
+  @@unique([shareId, email])
+  @@index([userId])
+  @@map("share_grants")
+}

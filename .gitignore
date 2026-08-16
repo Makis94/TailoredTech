@@ -1,0 +1,9 @@
+# OS / editor cruft not already covered by backend/.gitignore or frontend/.gitignore
+.DS_Store
+*.swp
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Local Postgres/S3 data used for testing without Docker in this sandbox
+.local-dev-data/

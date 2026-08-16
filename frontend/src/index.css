@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+
+  /* "Vault ledger" palette: warm paper + deep navy structure + a brass accent
+     reserved for focus states and small highlights (never flooded across the UI). */
+  --background: #fafaf9;
+  --foreground: #16213a;
+  --card: #ffffff;
+  --card-foreground: #16213a;
+  --popover: #ffffff;
+  --popover-foreground: #16213a;
+  --primary: #1e3a5f;
+  --primary-foreground: #fafaf9;
+  --secondary: #efede7;
+  --secondary-foreground: #16213a;
+  --muted: #f2f1ec;
+  --muted-foreground: #6b7280;
+  --accent: #b8862e;
+  --accent-foreground: #16213a;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --border: #e2e1dc;
+  --input: #e2e1dc;
+  --ring: #b8862e;
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #e8e6df;
+  --card: #111a2c;
+  --card-foreground: #e8e6df;
+  --popover: #111a2c;
+  --popover-foreground: #e8e6df;
+  --primary: #7c9cc4;
+  --primary-foreground: #0b1220;
+  --secondary: #1a2438;
+  --secondary-foreground: #e8e6df;
+  --muted: #17213a;
+  --muted-foreground: #93a0b8;
+  --accent: #d6a94a;
+  --accent-foreground: #0b1220;
+  --destructive: #e5484d;
+  --destructive-foreground: #0b1220;
+  --border: #24314d;
+  --input: #24314d;
+  --ring: #d6a94a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
