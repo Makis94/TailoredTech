@@ -6,8 +6,9 @@ How responsibility for this project was split between human direction and AI-ass
 
 - **Technology stack**: NestJS for the backend (specified up front), Prisma + PostgreSQL, React + TypeScript + Vite + Tailwind for the frontend, S3-compatible object storage, and JWT email/password authentication over Google OAuth (avoids needing external OAuth credentials for local development).
 - **Architectural direction**: the overall shape of the solution — Data Room → Folder → File hierarchy, read-only sharing via public links and per-user invites, and which optional/extra-credit features to build (search, file versioning).
-- **Repository and folder structure**: the `backend/` / `frontend/` split and the naming of modules/folders within each.
-- **Code review**: all AI-generated code was reviewed before being accepted.
+- **Repository and folder structure**: the `backend/` / `frontend/` split and the naming of modules/folders within each, and ongoing management of the monorepo as a whole.
+- **Code review**: all AI-generated code was reviewed before being accepted, including a pass over the written frontend components and backend API specifically for code quality.
+- **Deployment process**: provisioning and account-level setup across Render (backend), Vercel (frontend), Neon (Postgres), and Cloudflare R2 (object storage) — creating the services, generating credentials, and driving each platform's dashboard through to a live deploy.
 
 ## Implemented by Claude Code (AI)
 
